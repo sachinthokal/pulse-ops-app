@@ -1,51 +1,127 @@
-# Pulse-Ops: High-Resilience Cloud-Native Observability Stack
+# Pulse-Ops: Enterprise Observability & Centralized Logging on AKS
 
-An enterprise-grade observability and distributed logging platform deployed on Azure Kubernetes Service (AKS). The architecture instruments a custom microservice (`pulse-ops`) with real-time metrics telemetry and centralized log aggregation, validated under a sustained 100,000-request stress test achieving a 0% error rate and sub-200ms tail latency.
+Production-grade observability and distributed logging platform deployed on Azure Kubernetes Service (AKS). The system instruments a dual-replica microservice (`pulse-ops`) behind an Azure Load Balancer, capturing real-time metrics with Prometheus/Grafana and centralizing containerd CRI logs with FluentBit/OpenSearch.
+
+The architecture was validated under a continuous 24-minute stress benchmark of **100,000 HTTP requests** at concurrency 10, maintaining a **0.00% error rate** and a **175 ms p99 tail latency**.
 
 ---
 
-## 🏗️ System Architecture
+## 🖥️ Live Telemetry & Control Center
+
+The application provides embedded runtime telemetry hooks to trigger compute load, inject simulated warnings/errors, and test Kubernetes readiness probes.
+
+<p align="center">
+  <img src="docs/images/control-center.png" alt="PulseOps Control Center UI" width="95%"/>
+</p>
+
+---
+
+## 🏗️ Architecture Flow
+
+```text
+                           [ Azure Standard Load Balancer ]
+                                          │
+                     ┌────────────────────┴────────────────────┐
+                     ▼                                         ▼
+         [ pulse-ops Pod: Replica 1 ]              [ pulse-ops Pod: Replica 2 ]
+           │                      │                  │                      │
+    (:8080/metrics)         (stdout/stderr)   (:8080/metrics)         (stdout/stderr)
+           │                      │                  │                      │
+           ▼                      │                  ▼                      │
+  [ Prometheus Scraper ]          │         [ Prometheus Scraper ]          │
+           │                      │                  │                      │
+           ▼                      │                  ▼                      │
+  [ Grafana Dashboards ]          │         [ Grafana Dashboards ]          │
+                                  └──────────────────┬──────────────────────┘
+                                                     ▼
+                                          [ FluentBit DaemonSet ]
+                                           (containerd CRI Parser)
+                                                     │
+                                                     ▼
+                                         [ OpenSearch Cluster:9200 ]
+                                          (pulse-ops-logs* Index)
+                                                     │
+                                                     ▼
+                                         [ OpenSearch Dashboards ]
 
 ```
-                                  [ Azure Load Balancer ]
-                                             │
-                                             ▼
-                               [ pulse-ops Pods (Dual Replica) ]
-                                  │                     │
-                    (HTTP Telemetry /metrics)       (stdout/stderr)
-                                  │                     │
-                                  ▼                     ▼
-                       [ Prometheus Server ]     [ FluentBit DaemonSet ]
-                                  │               (containerd CRI Parser)
-                                  ▼                     │
-                        [ Grafana Dashboard ]           ▼
-                                                 [ OpenSearch Cluster ]
-                                                        │
-                                                        ▼
-                                             [ OpenSearch Dashboards ]
 
-```
+### Component Breakdown
 
-### Components
-
-| Layer | Technology | Role / Specification |
+| Layer | Technology | Operational Function |
 | --- | --- | --- |
-| **Compute** | Azure Kubernetes Service (AKS) | Managed Kubernetes host with dual-node worker pools. |
-| **Workload** | Python / Flask (`pulse-ops`) | Dual-replica deployment handling HTTP requests, latency profiling, and dynamic event injection. |
-| **Ingress** | Azure Standard Load Balancer | External traffic ingress and Layer 4 load balancing across pods. |
-| **Metrics Pipeline** | Prometheus | Scrapes application runtime metrics and node metrics every 15s. |
-| **Visualization** | Grafana | Custom dashboard tracking RPS, p50/p95/p99 latencies, pod load balancing, and node saturation. |
-| **Log Collector** | FluentBit (DaemonSet) | Uses `cri` parsing for containerd logs, extracts Kubernetes metadata, and ships structured JSON. |
-| **Log Engine** | OpenSearch | Single-node distributed log indexer with disabled security plugins for streamlined lab access. |
-| **Log Discovery** | OpenSearch Dashboards | Visual analytics and DQL-based querying for high-cardinality log streams. |
+| **Cluster Orchestration** | Azure Kubernetes Service (AKS) | Multi-node worker pools hosting production and monitoring workloads. |
+| **Workload** | Python / Flask (`pulse-ops`) | Exposes application metrics (`/metrics`) and streams structured JSON logs to container stdout. |
+| **Ingress & Traffic Split** | Azure Standard Load Balancer | Distributes Layer 4 incoming traffic equally across active application pods. |
+| **Metrics Pipeline** | Prometheus Operator | Discovers pod endpoints dynamically via `ServiceMonitor` every 15s. |
+| **Metrics Visualization** | Grafana | Custom telemetry dashboard tracking RPS, p50/p95/p99 latency, and saturation. |
+| **Log Collector** | FluentBit (DaemonSet) | Mounts `/var/log/containers`, parses containerd CRI streams, and enriches logs with Kubernetes metadata. |
+| **Log Datastore** | OpenSearch | Single-node log indexing engine optimized with security plugins disabled for lab throughput. |
+| **Log Analytics UI** | OpenSearch Dashboards | Real-time discovery, field filtering, and histogram visualization of application events. |
 
 ---
 
-## 🚀 Key Configurations
+## 📊 Metrics Pipeline Verification (Prometheus & Grafana)
 
-### 1. FluentBit Collector (`fluent-bit-values.yaml`)
+### 1. Prometheus Scraper Target Health
 
-Configured to handle AKS `containerd` CRI formatted logs and ship them to the OpenSearch index `pulse-ops-logs`.
+The Prometheus Operator monitors pod instances dynamically through `ServiceMonitor` resources, maintaining dual-target availability.
+
+### 2. Grafana Advanced Observability Hub
+
+Real-time dashboard capturing overall health, traffic split across pods, latency distribution, and CPU/memory footprints.
+
+* **Traffic Split:** Incoming traffic maintained an equal 50/50 distribution across both pod replicas (~35 req/s per replica).
+* **Resource Stability:** Memory consumption remained flat at 27-28 MiB per pod throughout the 24-minute stress run, confirming zero memory leaks. Peak CPU stayed capped below 0.12 cores per container.
+* **Error Rate:** 0% 5xx errors recorded; cumulative request counter climbed past 265,000+.
+
+---
+
+## 🔍 Centralized Logging Pipeline (FluentBit & OpenSearch)
+
+FluentBit ingests raw container logs from `/var/log/containers/*pulse-ops*.log`, parses CRI output strings, attaches pod/node metadata, and pushes structured documents into OpenSearch.
+
+### Noise Isolation Query (DQL)
+
+To filter out Prometheus scraping (`/metrics`) and Kubernetes readiness probes (`/ready`) while inspecting application traffic:
+
+```text
+message: *HTTP* and not message: *metrics* and not message: *ready*
+
+```
+
+---
+
+## ⚡ 100,000-Request Stress Test Benchmark
+
+A sustained benchmark using ApacheBench (`ab`) validated cluster reliability, load balancing accuracy, and observability correlation under load.
+
+```bash
+ab -l -n 100000 -c 10 http://<EXTERNAL-IP>/
+
+```
+
+### Benchmark Results
+
+| Parameter | Observed Value | Production Impact |
+| --- | --- | --- |
+| **Total Completed Requests** | **100,000** | Full run completed without dropped connections. |
+| **Failed Requests** | **0** | **0.00% Error Rate** across 24 minutes of continuous traffic. |
+| **Total Test Duration** | **1,423.488 seconds (~23.7 min)** | Sustained endurance run verifying resource stability. |
+| **Throughput (Sustained)** | **70.25 req/sec** | Stable request processing rate under concurrent load. |
+| **Data Transferred** | **1.70 GB** (1,702,142,073 bytes) | High-volume payload delivery via Azure Load Balancer. |
+| **Network Transfer Rate** | **1,167.73 KB/sec** | Sustained network egress throughput. |
+| **Median Latency (p50)** | **118 ms** | 50% of requests served in under 120 ms. |
+| **P95 Latency** | **151 ms** | 95% of requests served in under 155 ms. |
+| **P99 Tail Latency** | **175 ms** | 99,000 requests served in under 175 ms. |
+
+---
+
+## 🛠️ Helm & Pipeline Configurations
+
+### 1. FluentBit (`k8s/fluent-bit-values.yaml`)
+
+Configured to use the `cri` parser to prevent log drops on containerd-based AKS nodes.
 
 ```yaml
 config:
@@ -72,7 +148,7 @@ config:
     [FILTER]
         Name                kubernetes
         Match               kube.*
-        Kube_URL            https://kubernetes.default.svc:443
+        Kube_URL            [https://kubernetes.default.svc:443](https://kubernetes.default.svc:443)
         Merge_Log           On
         Merge_Log_Key       log_processed
         Keep_Log            Off
@@ -93,9 +169,9 @@ config:
 
 ```
 
-### 2. OpenSearch Dashboards (`dashboards-values.yaml`)
+### 2. OpenSearch Dashboards (`k8s/dashboards-values.yaml`)
 
-Allocated dedicated memory limits to avoid NodeJS startup throttling and configured in no-auth mode.
+Allocates memory limits (1536Mi) to avoid NodeJS cold-start timeouts and disables UI security modules for direct lab access.
 
 ```yaml
 opensearchHosts: "http://opensearch-cluster-master:9200"
@@ -133,60 +209,9 @@ startupProbe:
 
 ---
 
-## ⚡ Stress Testing & System Verification
+## 🚀 Deployment Guide
 
-The infrastructure was subjected to a high-volume load test using ApacheBench to validate concurrency management, resource ceilings, and metric/log correlation under heavy load.
-
-```bash
-ab -l -n 100000 -c 10 http://<EXTERNAL-IP>/
-
-```
-
-### Benchmark Results
-
-| Metric | Result |
-| --- | --- |
-| **Total Completed Requests** | **100,000** |
-| **Failed Requests** | **0 (0.00% Error Rate)** |
-| **Test Duration** | **1,423.48 seconds (~23.7 minutes)** |
-| **Throughput (Sustained)** | **70.25 req/sec** |
-| **Total Network Transfer** | **1.70 GB** (1,702,142,073 bytes) |
-| **Median Latency (50%)** | **118 ms** |
-| **P95 Latency** | **151 ms** |
-| **P99 Tail Latency** | **175 ms** |
-
----
-
-## 📊 Telemetry & Observability Verification
-
-### 1. Real-Time Grafana Metrics
-
-* **Traffic Balancing:** The Azure Load Balancer divided traffic equally across both pods (~35 req/s per replica).
-* **Resource Stability:** Memory consumption remained flat at ~27 MiB per pod across the 24-minute stress run, confirming zero memory leaks. Peak CPU utilization stayed within 0.12 cores per pod.
-* **Service Levels:** Zero 5xx responses observed; `pulse_ops_requests_total` reflected cumulative increments up to 265K+.
-
-### 2. Centralized Logging (OpenSearch)
-
-* **Ingestion Throughput:** FluentBit parsed and indexed 124,000+ business HTTP access logs and diagnostic events during the benchmark without backpressure.
-* **Field Indexing:** Full metadata enrichment for `kubernetes.pod_name`, `kubernetes.host`, `status`, and `timestamp`.
-* **Noise Isolation Query (DQL):**
-```text
-message: *HTTP* and not message: *metrics* and not message: *ready*
-
-```
-
-
-
----
-
-## 🛠️ Deployment Instructions
-
-### Prerequisites
-
-* Azure CLI configured with an active AKS cluster.
-* Helm v3 and `kubectl` connected to your cluster context.
-
-### 1. Deploy the Application Workload
+### 1. Deploy the Application
 
 ```bash
 kubectl apply -f k8s/pulse-ops-deployment.yaml
@@ -194,10 +219,10 @@ kubectl apply -f k8s/pulse-ops-service.yaml
 
 ```
 
-### 2. Deploy Metrics Pipeline (Prometheus & Grafana)
+### 2. Deploy Prometheus & Grafana
 
 ```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add prometheus-community [https://prometheus-community.github.io/helm-charts](https://prometheus-community.github.io/helm-charts)
 helm repo update
 
 helm install monitoring prometheus-community/kube-prometheus-stack \
@@ -208,31 +233,29 @@ helm install monitoring prometheus-community/kube-prometheus-stack \
 ### 3. Deploy OpenSearch & Dashboards
 
 ```bash
-helm repo add opensearch https://opensearch-project.github.io/helm-charts
+helm repo add opensearch [https://opensearch-project.github.io/helm-charts](https://opensearch-project.github.io/helm-charts)
 helm repo update
 
-# Install OpenSearch Cluster
 helm install opensearch-cluster opensearch/opensearch \
   --namespace logging --create-namespace \
   --set singleNode=true \
   --set config."plugins\.security\.disabled"=true
 
-# Install OpenSearch Dashboards
 helm install opensearch-dashboards opensearch/opensearch-dashboards \
   --namespace logging \
-  -f dashboards-values.yaml
+  -f k8s/dashboards-values.yaml
 
 ```
 
 ### 4. Deploy FluentBit DaemonSet
 
 ```bash
-helm repo add fluent https://fluent.github.io/helm-charts
+helm repo add fluent [https://fluent.github.io/helm-charts](https://fluent.github.io/helm-charts)
 helm repo update
 
 helm install fluent-bit fluent/fluent-bit \
   --namespace logging \
-  -f fluent-bit-values.yaml
+  -f k8s/fluent-bit-values.yaml
 
 ```
 
@@ -240,10 +263,10 @@ helm install fluent-bit fluent/fluent-bit \
 
 ## 🧹 Resource Teardown
 
-To avoid unnecessary cloud consumption, tear down the deployed resources:
+To release cloud resources and prevent ongoing billing:
 
 ```bash
-# Remove Helm charts
+# Uninstall logging and monitoring Helm releases
 helm uninstall fluent-bit -n logging
 helm uninstall opensearch-dashboards -n logging
 helm uninstall opensearch-cluster -n logging
@@ -253,7 +276,34 @@ helm uninstall monitoring -n monitoring
 kubectl delete -f k8s/pulse-ops-service.yaml
 kubectl delete -f k8s/pulse-ops-deployment.yaml
 
-# Delete namespaces
+# Clean up namespaces
 kubectl delete namespace logging monitoring
 
 ```
+---
+
+---
+
+## 📸 System Telemetry & Visual Showcase
+
+### 1. Prometheus Target Scraping (ServiceMonitor Health)
+<p align="center">
+  <img src="docs/images/prometheus-targets.png" alt="Prometheus ServiceMonitor Targets UP" width="95%"/>
+</p>
+
+### 2. Grafana Telemetry Dashboard (Throughput, Latency & Load Balancing)
+<p align="center">
+  <img src="docs/images/grafana-dashboard.png" alt="Grafana Telemetry Dashboard Overview" width="95%"/>
+</p>
+
+### 3. OpenSearch Dashboards (Real-Time Container Log Analytics)
+<p align="center">
+  <img src="docs/images/opensearch-dashboards.png" alt="OpenSearch Discover Log Analytics" width="95%"/>
+</p>
+
+### 4. ApacheBench 100k Stress Test Execution (0% Drop / Sub-200ms)
+<p align="center">
+  <img src="docs/images/ab-load-test.png" alt="ApacheBench 100k Benchmark Execution" width="95%"/>
+</p>
+
+---
