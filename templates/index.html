@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PulseOps - Observability Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
+    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .header { background: #1e293b; padding: 20px; border-radius: 8px; border-left: 4px solid #38bdf8; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { margin: 0; font-size: 24px; color: #38bdf8; }
+    .metadata { display: flex; gap: 15px; font-size: 13px; color: #94a3b8; }
+    .metadata span b { color: #f1f5f9; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: #1e293b; border-radius: 8px; padding: 20px; border: 1px solid #334155; }
+    .card h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+    .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+    button { padding: 12px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-info { background: #0284c7; color: white; }
+    .btn-warn { background: #d97706; color: white; }
+    .btn-error { background: #dc2626; color: white; }
+    .btn-burn { background: #7c3aed; color: white; }
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    .console-box { background: #020617; border: 1px solid #1e293b; border-radius: 6px; padding: 15px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #22c55e; }
+    .log-item { margin-bottom: 6px; word-break: break-all; }
+    .log-error { color: #ef4444; }
+    .log-warn { color: #f59e0b; }
+    a.link-tag { color: #38bdf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>PulseOps Control Center</h1>
+        <small>Targeting Prometheus, Grafana, FluentBit & OpenSearch</small>
+      </div>
+      <div class="metadata">
+        <span>Version: <b>{{ app_version }}</b></span>
+        <span>Pod: <b>{{ pod_name }}</b></span>
+        <span>Node: <b>{{ node_name }}</b></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Section A: Metrics Generator -->
+      <div class="card">
+        <h2>📊 Metrics Triggers (Prometheus)</h2>
+        <p style="font-size: 13px; color: #94a3b8;">Trigger CPU burn or traffic counters to observe graphs inside Grafana.</p>
+        <div class="btn-group">
+          <button class="btn-burn" onclick="triggerCpuBurn()">🔥 Simulate CPU Burn (4s Load)</button>
+          <button class="btn-info" onclick="generateTraffic()">⚡ Hit Standard Request (/api/log)</button>
+        </div>
+        <p style="margin-top: 15px; font-size: 12px; color: #64748b;">
+          Prometheus Endpoint: <a class="link-tag" href="/metrics" target="_blank">/metrics</a>
+        </p>
+      </div>
+
+      <!-- Section B: Logging Generator -->
+      <div class="card">
+        <h2>📝 Logging Simulator (FluentBit)</h2>
+        <p style="font-size: 13px; color: #94a3b8;">Generate structured JSON logs to query later in OpenSearch Dashboards.</p>
+        <div class="btn-group">
+          <button class="btn-info" onclick="sendLog('INFO', 'User authentication successful')">Generate INFO Log</button>
+          <button class="btn-warn" onclick="sendLog('WARN', 'Cache miss rate reached 45%')">Generate WARNING Log</button>
+          <button class="btn-error" onclick="sendLog('ERROR', 'Connection timed out to database:5432')">Generate ERROR Log</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Realtime Activity Console -->
+    <div class="card">
+      <h2>🖥️ App Activity Log (Client View)</h2>
+      <div id="console" class="console-box">
+        <div class="log-item">> System initialized and ready to collect telemetry.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function appendConsole(msg, cls = "") {
+      const box = document.getElementById("console");
+      const item = document.createElement("div");
+      item.className = "log-item " + cls;
+      item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      box.appendChild(item);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function triggerCpuBurn() {
+      appendConsole("Triggering CPU Burn...", "log-warn");
+      try {
+        const res = await fetch("/api/cpu-burn", { method: "POST" });
+        const data = await res.json();
+        appendConsole("CPU Burn Completed: " + data.message, "log-warn");
+      } catch (e) {
+        appendConsole("CPU Burn Failed", "log-error");
+      }
+    }
+
+    async function sendLog(level, message) {
+      appendConsole(`Posting ${level}: "${message}"`, level === "ERROR" ? "log-error" : level === "WARN" ? "log-warn" : "");
+      try {
+        await fetch("/api/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level, message })
+        });
+      } catch (e) {
+        appendConsole("Failed to emit log", "log-error");
+      }
+    }
+
+    function generateTraffic() {
+      sendLog("INFO", "Routine API transaction received");
+    }
+  </script>
+</body>
+</html>
