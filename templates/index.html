@@ -2,118 +2,420 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PulseOps - Observability Hub</title>
+  <title>PulseOps | Production Observability Suite</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
-    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    .header { background: #1e293b; padding: 20px; border-radius: 8px; border-left: 4px solid #38bdf8; display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { margin: 0; font-size: 24px; color: #38bdf8; }
-    .metadata { display: flex; gap: 15px; font-size: 13px; color: #94a3b8; }
-    .metadata span b { color: #f1f5f9; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .card { background: #1e293b; border-radius: 8px; padding: 20px; border: 1px solid #334155; }
-    .card h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-    .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-    button { padding: 12px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-    .btn-info { background: #0284c7; color: white; }
-    .btn-warn { background: #d97706; color: white; }
-    .btn-error { background: #dc2626; color: white; }
-    .btn-burn { background: #7c3aed; color: white; }
-    button:hover { opacity: 0.9; transform: translateY(-1px); }
-    .console-box { background: #020617; border: 1px solid #1e293b; border-radius: 6px; padding: 15px; height: 180px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #22c55e; }
-    .log-item { margin-bottom: 6px; word-break: break-all; }
-    .log-error { color: #ef4444; }
-    .log-warn { color: #f59e0b; }
-    a.link-tag { color: #38bdf8; text-decoration: none; }
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(21, 28, 44, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-blue: #38bdf8;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at top right, #172554, var(--bg-dark) 45%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      padding: 30px 20px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header Component */
+    .header {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.5);
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 4px; height: 100%;
+      background: linear-gradient(to bottom, var(--accent-blue), var(--accent-purple));
+    }
+    .brand h1 {
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .brand p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .cluster-badges {
+      display: flex;
+      gap: 12px;
+    }
+    .badge {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .badge span {
+      font-weight: 600;
+      color: var(--accent-blue);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    /* Live Counter Stat Strip */
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      backdrop-filter: blur(8px);
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    .stat-card .value {
+      font-size: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      margin-top: 6px;
+      color: #fff;
+    }
+
+    /* Grid sections */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .panel-title {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    /* Interactive Buttons */
+    .btn-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    button {
+      padding: 14px 18px;
+      border-radius: 10px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+    }
+    button:active { transform: scale(0.98); }
+    
+    .btn-burn {
+      background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+    }
+    .btn-burn:hover { filter: brightness(1.1); }
+
+    .btn-traffic {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.3);
+    }
+    .btn-traffic:hover { filter: brightness(1.1); }
+
+    .btn-info { background: #1e293b; border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; }
+    .btn-info:hover { background: rgba(56, 189, 248, 0.1); }
+
+    .btn-warn { background: #1e293b; border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b; }
+    .btn-warn:hover { background: rgba(245, 158, 11, 0.1); }
+
+    .btn-error { background: #1e293b; border: 1px solid rgba(244, 63, 94, 0.4); color: #f43f5e; }
+    .btn-error:hover { background: rgba(244, 63, 94, 0.1); }
+
+    .endpoint-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--accent-blue);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 14px;
+    }
+
+    /* Terminal Console */
+    .console-panel {
+      background: #050811;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .console-topbar {
+      background: #0c1222;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+    }
+    .console-dots { display: flex; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ef4444; } .dot-y { background: #f59e0b; } .dot-g { background: #10b981; }
+    .console-title { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); }
+    
+    .console-window {
+      padding: 16px;
+      height: 220px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .log-line { margin-bottom: 4px; display: flex; gap: 10px; }
+    .log-time { color: #64748b; }
+    .log-level-INFO { color: #38bdf8; font-weight: 600; }
+    .log-level-WARN { color: #f59e0b; font-weight: 600; }
+    .log-level-ERROR { color: #f43f5e; font-weight: 600; }
+    .log-msg { color: #cbd5e1; }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <div class="header">
-      <div>
+      <div class="brand">
         <h1>PulseOps Control Center</h1>
-        <small>Targeting Prometheus, Grafana, FluentBit & OpenSearch</small>
+        <p>Enterprise Telemetry Harness • Prometheus & OpenSearch</p>
       </div>
-      <div class="metadata">
-        <span>Version: <b>{{ app_version }}</b></span>
-        <span>Pod: <b>{{ pod_name }}</b></span>
-        <span>Node: <b>{{ node_name }}</b></span>
+      <div class="cluster-badges">
+        <div class="badge">IMAGE VERSION<span id="meta-ver">{{ app_version }}</span></div>
+        <div class="badge">ACTIVE POD<span title="{{ pod_name }}">{{ pod_name[:18] }}...</span></div>
+        <div class="badge">TARGET NODE<span title="{{ node_name }}">{{ node_name[:18] }}...</span></div>
       </div>
     </div>
 
+    <!-- Live Telemetry Counters Strip -->
+    <div class="stat-strip">
+      <div class="stat-card">
+        <div class="label">Total Requests</div>
+        <div class="value" id="cnt-req" style="color: var(--accent-blue);">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Simulated Errors</div>
+        <div class="value" id="cnt-err" style="color: var(--accent-rose);">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">CPU Burn Cycles</div>
+        <div class="value" id="cnt-burn" style="color: var(--accent-purple);">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Active Health Status</div>
+        <div class="value" style="color: var(--accent-emerald); font-size: 18px; margin-top: 10px;">● Healthy</div>
+      </div>
+    </div>
+
+    <!-- Dual Actions Grid -->
     <div class="grid">
-      <!-- Section A: Metrics Generator -->
-      <div class="card">
-        <h2>📊 Metrics Triggers (Prometheus)</h2>
-        <p style="font-size: 13px; color: #94a3b8;">Trigger CPU burn or traffic counters to observe graphs inside Grafana.</p>
-        <div class="btn-group">
-          <button class="btn-burn" onclick="triggerCpuBurn()">🔥 Simulate CPU Burn (4s Load)</button>
-          <button class="btn-info" onclick="generateTraffic()">⚡ Hit Standard Request (/api/log)</button>
+      <!-- Prometheus Panel -->
+      <div class="panel">
+        <div>
+          <div class="panel-header">
+            <div class="panel-title">📊 Metrics Pipeline</div>
+            <span style="font-size: 12px; color: var(--accent-purple); font-weight: 600;">Prometheus Scraping</span>
+          </div>
+          <p class="panel-desc">Push transient compute loads and standard HTTP requests to observe dynamic spikes inside Grafana dashboards.</p>
+          <div class="btn-stack">
+            <button class="btn-burn" id="btn-burn" onclick="triggerCpuBurn()">
+              ⚡ Simulate CPU Burn (4s Saturation)
+            </button>
+            <button class="btn-traffic" onclick="generateTraffic()">
+              📈 Hit Normal HTTP Request
+            </button>
+          </div>
         </div>
-        <p style="margin-top: 15px; font-size: 12px; color: #64748b;">
-          Prometheus Endpoint: <a class="link-tag" href="/metrics" target="_blank">/metrics</a>
-        </p>
+        <a class="endpoint-link" href="/metrics" target="_blank">
+          <span>Explore Scrape Endpoint</span> ↗
+        </a>
       </div>
 
-      <!-- Section B: Logging Generator -->
-      <div class="card">
-        <h2>📝 Logging Simulator (FluentBit)</h2>
-        <p style="font-size: 13px; color: #94a3b8;">Generate structured JSON logs to query later in OpenSearch Dashboards.</p>
-        <div class="btn-group">
-          <button class="btn-info" onclick="sendLog('INFO', 'User authentication successful')">Generate INFO Log</button>
-          <button class="btn-warn" onclick="sendLog('WARN', 'Cache miss rate reached 45%')">Generate WARNING Log</button>
-          <button class="btn-error" onclick="sendLog('ERROR', 'Connection timed out to database:5432')">Generate ERROR Log</button>
+      <!-- FluentBit Panel -->
+      <div class="panel">
+        <div>
+          <div class="panel-header">
+            <div class="panel-title">📝 Centralized Logging</div>
+            <span style="font-size: 12px; color: var(--accent-emerald); font-weight: 600;">FluentBit Ingestion</span>
+          </div>
+          <p class="panel-desc">Produce structured JSON payloads on standard out. FluentBit parses and indexes these payloads into OpenSearch.</p>
+          <div class="btn-stack">
+            <button class="btn-info" onclick="sendLog('INFO', 'Customer payment token verified')">
+              + Generate INFO Event
+            </button>
+            <button class="btn-warn" onclick="sendLog('WARN', 'Database connection pool usage above 75%')">
+              ⚠ Generate WARN Event
+            </button>
+            <button class="btn-error" onclick="sendLog('ERROR', 'Deadlock detected while committing balance transfer')">
+              ✖ Generate ERROR Event
+            </button>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 14px; font-family: 'JetBrains Mono', monospace;">
+          Format: JSON via Stdout
         </div>
       </div>
     </div>
 
-    <!-- UI Realtime Activity Console -->
-    <div class="card">
-      <h2>🖥️ App Activity Log (Client View)</h2>
-      <div id="console" class="console-box">
-        <div class="log-item">> System initialized and ready to collect telemetry.</div>
+    <!-- Realtime Terminal Console -->
+    <div class="console-panel">
+      <div class="console-topbar">
+        <div class="console-dots">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+        </div>
+        <div class="console-title">telemetry-stream.stdout</div>
+        <div style="font-size: 11px; color: #64748b; font-family: 'JetBrains Mono', monospace;">Live Log View</div>
+      </div>
+      <div id="console" class="console-window">
+        <div class="log-line">
+          <span class="log-time">[BOOT]</span>
+          <span class="log-level-INFO">SYS</span>
+          <span class="log-msg">PulseOps telemetry stream initialized. Waiting for actions...</span>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    function appendConsole(msg, cls = "") {
-      const box = document.getElementById("console");
-      const item = document.createElement("div");
-      item.className = "log-item " + cls;
-      item.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      box.appendChild(item);
-      box.scrollTop = box.scrollHeight;
+    let reqCount = 0;
+    let errCount = 0;
+    let burnCount = 0;
+
+    function pushLogToTerminal(level, msg) {
+      const consoleBox = document.getElementById("console");
+      const line = document.createElement("div");
+      line.className = "log-line";
+      const timeStr = new Date().toTimeString().split(" ")[0];
+      line.innerHTML = `
+        <span class="log-time">${timeStr}</span>
+        <span class="log-level-${level}">[${level}]</span>
+        <span class="log-msg">${msg}</span>
+      `;
+      consoleBox.appendChild(line);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
     }
 
     async function triggerCpuBurn() {
-      appendConsole("Triggering CPU Burn...", "log-warn");
+      const btn = document.getElementById("btn-burn");
+      btn.innerText = "⏳ Saturating CPU Thread...";
+      btn.style.opacity = "0.7";
+      pushLogToTerminal("WARN", "Spawning CPU spinloop for 4 seconds...");
+
       try {
         const res = await fetch("/api/cpu-burn", { method: "POST" });
         const data = await res.json();
-        appendConsole("CPU Burn Completed: " + data.message, "log-warn");
-      } catch (e) {
-        appendConsole("CPU Burn Failed", "log-error");
+        burnCount++;
+        reqCount++;
+        document.getElementById("cnt-burn").innerText = burnCount;
+        document.getElementById("cnt-req").innerText = reqCount;
+        pushLogToTerminal("INFO", "CPU cycle completed: " + data.message);
+      } catch (err) {
+        pushLogToTerminal("ERROR", "CPU burn trigger failed");
+      } finally {
+        btn.innerText = "⚡ Simulate CPU Burn (4s Saturation)";
+        btn.style.opacity = "1";
       }
     }
 
     async function sendLog(level, message) {
-      appendConsole(`Posting ${level}: "${message}"`, level === "ERROR" ? "log-error" : level === "WARN" ? "log-warn" : "");
       try {
         await fetch("/api/log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ level, message })
         });
-      } catch (e) {
-        appendConsole("Failed to emit log", "log-error");
+        reqCount++;
+        if (level === "ERROR") errCount++;
+        document.getElementById("cnt-req").innerText = reqCount;
+        document.getElementById("cnt-err").innerText = errCount;
+        pushLogToTerminal(level, message);
+      } catch (err) {
+        pushLogToTerminal("ERROR", "Failed to reach /api/log endpoint");
       }
     }
 
     function generateTraffic() {
-      sendLog("INFO", "Routine API transaction received");
+      sendLog("INFO", "HTTP GET /api/v1/inventory - 200 OK");
     }
   </script>
 </body>
