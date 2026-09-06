@@ -29,7 +29,7 @@ spec:
           containerPort: 8080
         env:
         - name: APP_VERSION
-          value: "v1"
+          value: "v3"
         # Downward API: Take pod name directly from Kubernetes
         - name: POD_NAME
           valueFrom:

@@ -1,0 +1,30 @@
+opensearchHosts: "http://opensearch-cluster-master:9200"
+
+resources:
+  requests:
+    cpu: "300m"
+    memory: "768Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1536Mi"
+
+config:
+  opensearch_dashboards.yml: |
+    server.host: "0.0.0.0"
+    opensearch.hosts: ["http://opensearch-cluster-master:9200"]
+    opensearch.ssl.verificationMode: none
+
+opensearchAccount:
+  security:
+    disabled: true
+
+extraEnvs:
+  - name: DISABLE_SECURITY_DASHBOARDS_PLUGIN
+    value: "true"
+
+startupProbe:
+  tcpSocket:
+    port: 5601
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  failureThreshold: 30

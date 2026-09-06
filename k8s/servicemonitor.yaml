@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pulse-ops-servicemonitor
+  namespace: pulse-ops
+  labels:
+    # Imp: Helm release चे नाव दिले पाहिजे, जेणेकरून Prometheus Operator याला ओळखेल
+    release: monitoring-stack
+spec:
+  selector:
+    matchLabels:
+      app: pulse-ops
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 10s
+    scrapeTimeout: 5s

@@ -1,0 +1,15 @@
+singleNode: true
+replicas: 1
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1024Mi"
+
+# लॅब टेस्टिंगसाठी अंतर्गत SSL ऑथेंटिकेशन तात्पुरते बंद ठेवणे
+config:
+  opensearch.yml:
+    plugins.security.disabled: true
