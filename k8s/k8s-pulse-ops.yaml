@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: pulse-ops-app
-        image: sachinthokal/pulse-ops-app:v1
+        image: sachinthokal/pulse-ops-app:v3
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
